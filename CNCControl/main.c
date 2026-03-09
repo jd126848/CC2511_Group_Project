@@ -1,7 +1,7 @@
 /**************************************************************
  * main.c
- * rev 1.0 26-Feb-2026 jawwh
- * Group-Project
+ * rev 1.0 08-Mar-2026 jawwh
+ * CNCControl
  * ***********************************************************/
 
 #include "pico/stdlib.h"
@@ -10,9 +10,9 @@
 
 
 int main(void) {
-  // TODO - Initialise components and variables
   stdio_init_all();
+  
   while (true) {
-    // TODO - Repeated code here
+    printf("Hello\r\n");
   }
 }
