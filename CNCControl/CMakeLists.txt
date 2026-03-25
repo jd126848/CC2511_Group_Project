@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.12)
 include(pico_sdk_import.cmake)
 
-set(projname "CNCControl")
+set(projname "milling_basic")
 
 project(${projname} C CXX ASM)
 set(CMAKE_C_STANDARD 11)
@@ -13,8 +13,9 @@ pico_sdk_init()
 
 add_executable(${projname}
         main.c
+        mmhal.c
         )
 
-target_link_libraries(${projname} pico_stdlib pico_stdio_usb)
+target_link_libraries(${projname} pico_stdlib hardware_pwm)
 pico_add_extra_outputs(${projname})
 
