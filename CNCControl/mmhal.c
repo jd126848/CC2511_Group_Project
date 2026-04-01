@@ -170,5 +170,10 @@ void mmhal_step_motors_impl(int dirs[])
 void mmhal_step_motors(int x_dir, int y_dir, int z_dir)
 {
   int dirs[3] = {x_dir, y_dir, z_dir};
+  for (size_t i = 0; i < 200; i++)
+  {
+    /* code */
+  }
+  
   mmhal_step_motors_impl(dirs);
 }
