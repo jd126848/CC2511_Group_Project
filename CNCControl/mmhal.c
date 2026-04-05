@@ -78,26 +78,28 @@ void mmhal_set_spindle_pwm(uint16_t pwm_level)
 void mmhal_set_microstepping(int x_or_y, mmhal_microstep_mode_t mode)
 {
   int mode0_pin;
-  const mode_values[6][3] = {
+  const int mode_values[6][3] = {
     {0,0,0},
     {1,0,0},
     {0,1,0},
     {1,1,0},
     {0,0,1},
     {1,0,1}
-};
+  };
 
-  if (x_or_y) {
-    mode0_pin = 7;
-  }
-  else {
-    mode0_pin = 2;
-  }
+  mode0_pin = x_or_y ? Y_MODE0_PIN : X_MODE0_PIN;
+  printf("Mode0Pin: %d\r\n", mode0_pin);
+  // if (x_or_y) {
+  //   mode0_pin = Y_MODE0_PIN;
+  // }
+  // else {
+  //   mode0_pin = X_MODE0_PIN;
+  // }
   
   gpio_put(mode0_pin, mode_values[mode][0]);
-  gpio_put(mode0_pin, mode_values[mode][1]);
-  gpio_put(mode0_pin, mode_values[mode][2]);
-  printf("Microstepping Mode: %d", mode);
+  gpio_put(mode0_pin + 1, mode_values[mode][1]);
+  gpio_put(mode0_pin + 2, mode_values[mode][2]);
+  printf("Microstepping Mode: %d\r\n", mode);
 
   // TODO - Implement microstepping mode setting
 }
@@ -109,47 +111,49 @@ void mmhal_set_microstepping(int x_or_y, mmhal_microstep_mode_t mode)
  */
 void mmhal_step_motors_impl(int dirs[])
 {
-  printf("%d x, %d y", dirs[XDIM], dirs[YDIM]);
-  dirs[XDIM] *= stepper_multipliers[XDIM];
-  dirs[YDIM] *= stepper_multipliers[YDIM];
-  dirs[ZDIM] *= stepper_multipliers[ZDIM];
+  printf("%d x, %d y, %d z\r\n", dirs[XDIM], dirs[YDIM], dirs[ZDIM]);
+  int xDir = dirs[XDIM] * stepper_multipliers[XDIM];
+  int yDir = dirs[YDIM] * stepper_multipliers[YDIM];
+  int zDir = dirs[ZDIM] * stepper_multipliers[ZDIM];
 
-  if (dirs[XDIM] == 1) {
+  if (xDir == 1) {
     gpio_put(XDIR_PIN, 1);
     gpio_put(XSTEP_PIN, 1);
     sleep_us(mmhal_high_delay_us);
     gpio_put(XSTEP_PIN, 0);
     sleep_us(mmhal_low_delay_us);
   }
-  if (dirs[XDIM] == -1) {
+  else if (xDir == -1) {
     gpio_put(XDIR_PIN, 0);
     gpio_put(XSTEP_PIN, 1);
     sleep_us(mmhal_high_delay_us);
     gpio_put(XSTEP_PIN, 0);
     sleep_us(mmhal_low_delay_us);
   }
-  if (dirs[YDIM] == 1) {
+
+  if (yDir == 1) {
     gpio_put(YDIR_PIN, 1);
     gpio_put(YSTEP_PIN, 1);
     sleep_us(mmhal_high_delay_us);
     gpio_put(YSTEP_PIN, 0);
     sleep_us(mmhal_low_delay_us);
   }
-  if (dirs[YDIM] == -1) {
+  else if (yDir == -1) {
     gpio_put(YDIR_PIN, 0);
     gpio_put(YSTEP_PIN, 1);
     sleep_us(mmhal_high_delay_us);
     gpio_put(YSTEP_PIN, 0);
     sleep_us(mmhal_low_delay_us);
   }
-  if (dirs[ZDIM] == 1) {
+  
+  if (zDir == 1) {
     gpio_put(ZDIR_PIN, 1);
     gpio_put(ZSTEP_PIN, 1);
     sleep_us(mmhal_high_delay_us);
     gpio_put(ZSTEP_PIN, 0);
     sleep_us(mmhal_low_delay_us);
   }
-  if (dirs[ZDIM] == -1) {
+  else if (zDir == -1) {
     gpio_put(ZDIR_PIN, 0);
     gpio_put(ZSTEP_PIN, 1);
     sleep_us(mmhal_high_delay_us);
@@ -170,10 +174,9 @@ void mmhal_step_motors_impl(int dirs[])
 void mmhal_step_motors(int x_dir, int y_dir, int z_dir)
 {
   int dirs[3] = {x_dir, y_dir, z_dir};
-  for (size_t i = 0; i < 200; i++)
+  for (size_t i = 0; i < 800; i++)
   {
     /* code */
+    mmhal_step_motors_impl(dirs);
   }
-  
-  mmhal_step_motors_impl(dirs);
 }

@@ -59,7 +59,7 @@ void handle_manual_mode() {
           spindle_speed++;
           mmhal_set_spindle_pwm(spindle_pwm_levels[spindle_speed]);
         }
-        printf("Speed: %d", spindle_speed);
+        printf("Speed: %d\r\n", spindle_speed);
         break;
       case '-':
       case '_':
