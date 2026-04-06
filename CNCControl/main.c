@@ -19,9 +19,10 @@ int spindle_speed = 0;
 
 int microsteps = 1;
 
-int Xcoord;
-int Ycoord;
-int Zcoord;
+int current_coords[3];
+
+int next_coords[3];
+int feed_rate; 
 
 bool manual_mode = true; // Start in manual mode for testing
 
@@ -99,6 +100,9 @@ void handle_manual_mode() {
         mmhal_set_microstepping(1, MMHAL_MS_MODE_32);
         microsteps = 32;
         break;
+      case '\033': // escape character
+        manual_mode = false;
+        break;
       default:
         // printf("%d", ch);
         break;
@@ -135,6 +139,22 @@ void process_input() {
   }
 }
 
+void handle_command_mode() {
+  process_input();
+  if (command_complete) {
+    if (3 == sscanf(command, "G00 X%i Y%i Z%i", &next_coords[XDIM], &next_coords[YDIM], &next_coords[ZDIM])) {
+      // Move to coords x,y,z no microstepping
+    }
+    else if (3 <= sscanf(command, "G01 X%i Y%i Z%i F%i", &next_coords[XDIM], &next_coords[YDIM], &next_coords[ZDIM], &feed_rate)) {
+      // Move to coords x,y,z (F is optional)
+    }
+    else if (1 == sscanf(command, "G04 P%f")) {
+
+    }
+    else if ()
+  }
+}
+
 int main(void) {
   // Initialise components and variables
   stdio_init_all();
@@ -146,8 +166,7 @@ int main(void) {
       handle_manual_mode();
       }
     else {
-      process_input();
-      // handle_command_mode();
+      handle_command_mode();
     }
   }
 }
