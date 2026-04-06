@@ -6,6 +6,12 @@
 #define CNC_VERSION 2
 #endif
 
+// Movement Limits (mm)
+#define X_LIMIT 300
+#define Y_LIMIT 175
+#define Z_LIMIT 43
+
+
 // Pin numbers arrays
 const int step_pins[] = {XSTEP_PIN, YSTEP_PIN, ZSTEP_PIN};
 const int dir_pins[] = {XDIR_PIN, YDIR_PIN, ZDIR_PIN};
@@ -19,7 +25,7 @@ const int stepper_multipliers[] = {1, -1, 1};
 #error "Invalid CNC_VERSION"
 #endif
 
-volatile int mmhal_high_delay_us = 2000; // Microseconds for step pulse high time
+volatile int mmhal_high_delay_us = 2; // Microseconds for step pulse high time
 volatile int mmhal_low_delay_us = 1000;   // Microseconds for step pulse low time
 
 /**
@@ -174,7 +180,7 @@ void mmhal_step_motors_impl(int dirs[])
 void mmhal_step_motors(int x_dir, int y_dir, int z_dir)
 {
   int dirs[3] = {x_dir, y_dir, z_dir};
-  for (size_t i = 0; i < 800; i++)
+  for (size_t i = 0; i < 50; i++)
   {
     /* code */
     mmhal_step_motors_impl(dirs);

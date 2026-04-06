@@ -1,0 +1,61 @@
+#:kivy !
+BoxLayout:
+    BoxLayout:
+        size_hint_x: 0.2
+        orientation: 'vertical'
+        BoxLayout:
+            size_hint_y: 0.2
+            orientation: 'vertical'
+            Label:
+                text: "Sort by:"
+            Spinner:
+                id: sorting_spinner
+                text_autoupdate: True
+                values: ["Author", "Title", "Pages", "Completed"]
+                on_text: app.update_book_widgets()
+        BoxLayout:
+            size_hint_y: 0.55
+            orientation: 'vertical'
+            Label:
+                text: "Add book..."
+            Label:
+                text: "Title:"
+            TextInput:
+                id: title
+                multiline: False
+                write_tab: False
+            Label:
+                text: "Author:"
+            TextInput:
+                id: author
+                multiline: False
+                write_tab: False
+            Label:
+                text: "Pages:"
+            TextInput:
+                id: pages
+                multiline: False
+                write_tab: False
+        BoxLayout:
+            size_hint_y: 0.25
+            orientation: 'vertical'
+            Button:
+                text: "Add Book"
+                on_release: app.handle_add()
+            Button:
+                text: "Clear"
+                on_release: app.handle_clear()
+
+    BoxLayout:
+        size_hint_x: 0.8
+        orientation: 'vertical'
+        Label:
+            size_hint_y: 0.1
+            text: app.unread_pages_text
+        BoxLayout:
+            size_hint_y: 0.8
+            orientation: 'vertical'
+            id: books_entry_box
+        Label:
+            size_hint_y: 0.1
+            text: app.status_text

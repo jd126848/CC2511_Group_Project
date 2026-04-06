@@ -26,10 +26,24 @@ int feed_rate;
 
 bool manual_mode = true; // Start in manual mode for testing
 
-
 char command[COMMAND_BUFFER_SIZE];
 unsigned int command_index = 0;
 bool command_complete = false;
+
+
+void calibrate_position() {
+  while (gpio_get(XLIMIT_PIN)) {
+    mmhal_step_motors(-1,0,0);
+  }
+  while (gpio_get(YLIMIT_PIN)) {
+    mmhal_step_motors(-1,0,0);
+  }
+  while (gpio_get(ZLIMIT_PIN)) {
+    mmhal_step_motors(-1,0,0);
+  }
+}
+
+
 
 void handle_manual_mode() {
   int ch = getchar_timeout_us(0);
@@ -141,18 +155,18 @@ void process_input() {
 
 void handle_command_mode() {
   process_input();
-  if (command_complete) {
-    if (3 == sscanf(command, "G00 X%i Y%i Z%i", &next_coords[XDIM], &next_coords[YDIM], &next_coords[ZDIM])) {
-      // Move to coords x,y,z no microstepping
-    }
-    else if (3 <= sscanf(command, "G01 X%i Y%i Z%i F%i", &next_coords[XDIM], &next_coords[YDIM], &next_coords[ZDIM], &feed_rate)) {
-      // Move to coords x,y,z (F is optional)
-    }
-    else if (1 == sscanf(command, "G04 P%f")) {
+  // if (command_complete) {
+  //   if (3 == sscanf(command, "G00 X%i Y%i Z%i", &next_coords[XDIM], &next_coords[YDIM], &next_coords[ZDIM])) {
+  //     // Move to coords x,y,z no microstepping
+  //   }
+  //   else if (3 <= sscanf(command, "G01 X%i Y%i Z%i F%i", &next_coords[XDIM], &next_coords[YDIM], &next_coords[ZDIM], &feed_rate)) {
+  //     // Move to coords x,y,z (F is optional)
+  //   }
+  //   else if (1 == sscanf(command, "G04 P%f")) {
 
-    }
-    else if ()
-  }
+  //   }
+  //   else if ()
+  // }
 }
 
 int main(void) {
