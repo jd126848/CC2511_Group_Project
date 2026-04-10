@@ -1,61 +1,67 @@
-#:kivy !
 BoxLayout:
-    BoxLayout:
-        size_hint_x: 0.2
-        orientation: 'vertical'
-        BoxLayout:
-            size_hint_y: 0.2
-            orientation: 'vertical'
-            Label:
-                text: "Sort by:"
-            Spinner:
-                id: sorting_spinner
-                text_autoupdate: True
-                values: ["Author", "Title", "Pages", "Completed"]
-                on_text: app.update_book_widgets()
-        BoxLayout:
-            size_hint_y: 0.55
-            orientation: 'vertical'
-            Label:
-                text: "Add book..."
-            Label:
-                text: "Title:"
-            TextInput:
-                id: title
-                multiline: False
-                write_tab: False
-            Label:
-                text: "Author:"
-            TextInput:
-                id: author
-                multiline: False
-                write_tab: False
-            Label:
-                text: "Pages:"
-            TextInput:
-                id: pages
-                multiline: False
-                write_tab: False
-        BoxLayout:
-            size_hint_y: 0.25
-            orientation: 'vertical'
-            Button:
-                text: "Add Book"
-                on_release: app.handle_add()
-            Button:
-                text: "Clear"
-                on_release: app.handle_clear()
+    orientation: "vertical"
 
     BoxLayout:
-        size_hint_x: 0.8
-        orientation: 'vertical'
-        Label:
-            size_hint_y: 0.1
-            text: app.unread_pages_text
+        size_hint_y: 0.9
         BoxLayout:
-            size_hint_y: 0.8
-            orientation: 'vertical'
-            id: books_entry_box
+            orientation: "vertical"
+            size_hint_x: 0.3
+            Button:
+                text: "Calibrate"
+            BoxLayout:
+                Label:
+                    text: "Spindle Speed"
+                Spinner:
+                    id: spindle_speed_spinner
+                    text_autoupdate: True
+                    values: ["Off", "Low", "Medium", "Fast", "Very Fast"]
+                    on_text: app.set_spinner_speed()
+            BoxLayout:
+                Label:
+                    text: "Microstepping"
+                Spinner:
+                    id: microsteps_spinner
+                    text_autoupdate: True
+                    values: ["1step/step", "2microsteps/step", "4microsteps/step", "8microsteps/step", "16microsteps/step", "32microsteps/step"]
+                    on_text: app.set_microsteps()
+            Button:
+                background_color: "red"
+                text: "Import G-Code File"
+                on_release: app.handle_gcode()
+        BoxLayout:
+            orientation: "vertical"
+            size_hint_x: 0.7
+            BoxLayout:
+                orientation: "vertical"
+                size_hint_y: 0.2
+                Label:
+                    size_hint_y: 0.8
+                    text: "Use WASD to control the horizontal position, E to raise the drill, Q to lower it\nBefore use, calibrate the drills position to prevent grating at limits\nImport G-Code files for predefined movements"
+                Label:
+                    size_hint_y: 0.2
+                    text: app.coords_text
+            BoxLayout:
+                canvas:
+                    Color:
+                        rgba: 1,1,1,1
+                    Rectangle:
+                        pos: self.x, self.y + (self.height - self.width * 175/300) / 2
+                        size: self.width, self.width*175/300
+                    Color:
+                        rgba: 1, 0, 0, 1
+                    Ellipse:
+                        size: 15,15
+                        pos: 100, 100
+
+
+    BoxLayout:
+        size_hint_y: 0.07
+        canvas:
+            Color:
+                rgba: 0.1, 0.1, 0.1, 1
+            Rectangle:
+                pos: self.pos
+                size: self.size
         Label:
-            size_hint_y: 0.1
             text: app.status_text
+

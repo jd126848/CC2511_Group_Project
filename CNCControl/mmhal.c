@@ -2,14 +2,11 @@
 #include "pico/stdlib.h"
 #include "hardware/pwm.h"
 
+#define CNC_VERSION 1
+
 #ifndef CNC_VERSION
 #define CNC_VERSION 2
 #endif
-
-// Movement Limits (mm)
-#define X_LIMIT 300
-#define Y_LIMIT 175
-#define Z_LIMIT 43
 
 
 // Pin numbers arrays
@@ -18,9 +15,9 @@ const int dir_pins[] = {XDIR_PIN, YDIR_PIN, ZDIR_PIN};
 
 // Multipliers for each axis, dealing with assymetric stepper directions
 #if CNC_VERSION == 1
-const int stepper_multipliers[] = {-1, 1, -1};
+const int stepper_multipliers[] = {-1, 1, 1};
 #elif CNC_VERSION == 2
-const int stepper_multipliers[] = {1, -1, 1};
+const int stepper_multipliers[] = {1, 1, 1};
 #else
 #error "Invalid CNC_VERSION"
 #endif
@@ -44,6 +41,10 @@ void mmhal_init()
   gpio_init(YFLT_PIN);
   gpio_init(SPINDLE_PIN);
   gpio_init(ENABLE_PIN);
+  gpio_init(VOUT_PIN);
+  gpio_init(XLIMIT_PIN);
+  gpio_init(YLIMIT_PIN);
+  gpio_init(ZLIMIT_PIN);
 
   gpio_set_dir(X_MODE0_PIN, GPIO_OUT);
   gpio_set_dir(X_MODE1_PIN, GPIO_OUT);
@@ -55,8 +56,13 @@ void mmhal_init()
   gpio_set_dir(YFLT_PIN, GPIO_IN);
   gpio_set_dir(SPINDLE_PIN, GPIO_OUT);
   gpio_set_dir(ENABLE_PIN, GPIO_OUT);
+  gpio_set_dir(VOUT_PIN, GPIO_OUT);
+  gpio_set_dir(XLIMIT_PIN, GPIO_IN);
+  gpio_set_dir(YLIMIT_PIN, GPIO_IN);
+  gpio_set_dir(ZLIMIT_PIN, GPIO_IN);
   
   gpio_put(ENABLE_PIN, 0);
+  gpio_put(VOUT_PIN, 1);
   for (int i = 0; i < DIMCOUNT; i++)
   {
     gpio_init(step_pins[i]);
@@ -94,7 +100,6 @@ void mmhal_set_microstepping(int x_or_y, mmhal_microstep_mode_t mode)
   };
 
   mode0_pin = x_or_y ? Y_MODE0_PIN : X_MODE0_PIN;
-  printf("Mode0Pin: %d\r\n", mode0_pin);
   // if (x_or_y) {
   //   mode0_pin = Y_MODE0_PIN;
   // }
@@ -105,7 +110,6 @@ void mmhal_set_microstepping(int x_or_y, mmhal_microstep_mode_t mode)
   gpio_put(mode0_pin, mode_values[mode][0]);
   gpio_put(mode0_pin + 1, mode_values[mode][1]);
   gpio_put(mode0_pin + 2, mode_values[mode][2]);
-  printf("Microstepping Mode: %d\r\n", mode);
 
   // TODO - Implement microstepping mode setting
 }
@@ -117,7 +121,7 @@ void mmhal_set_microstepping(int x_or_y, mmhal_microstep_mode_t mode)
  */
 void mmhal_step_motors_impl(int dirs[])
 {
-  printf("%d x, %d y, %d z\r\n", dirs[XDIM], dirs[YDIM], dirs[ZDIM]);
+  // printf("%d x, %d y, %d z\r\n", dirs[XDIM], dirs[YDIM], dirs[ZDIM]);
   int xDir = dirs[XDIM] * stepper_multipliers[XDIM];
   int yDir = dirs[YDIM] * stepper_multipliers[YDIM];
   int zDir = dirs[ZDIM] * stepper_multipliers[ZDIM];

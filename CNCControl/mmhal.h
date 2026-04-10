@@ -3,6 +3,11 @@
 
 #include <stdint.h>
 
+// Movement Limits (mm)
+#define X_LIMIT 300
+#define Y_LIMIT 175
+#define Z_LIMIT 43
+
 ///////////////////////////////////////////////////////////////////////
 // Pins
 ///////////////////////////////////////////////////////////////////////
@@ -37,7 +42,7 @@ enum
   YLIMIT_PIN = 20,
   ZLIMIT_PIN = 21,
   ENABLE_PIN = 22,
-  GPIO26_PIN = 26,
+  VOUT_PIN = 26,
   GPIO27_PIN = 27,
   GPIO28_PIN = 28
 };
