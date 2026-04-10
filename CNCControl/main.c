@@ -30,6 +30,206 @@ char command[COMMAND_BUFFER_SIZE];
 unsigned int command_index = 0;
 bool command_complete = false;
 
+// -------------------------
+// Machine state (minimal)
+// -------------------------
+typedef struct {
+    int absolute_mode;   // G90 = 1, G91 = 0
+    int units_mm;        // G21 = 1, G20 = 0
+    float feedrate;
+} MachineState;
+
+MachineState state;
+
+// -------------------------
+// Utility: remove comments
+// -------------------------
+void strip_comment(char *line)
+{
+    char *p = strchr(line, ';');
+    if (p) *p = '\0';
+}
+
+// -------------------------
+// Utility: trim whitespace
+// -------------------------
+void trim(char *line)
+{
+    // left trim
+    while (isspace((unsigned char)*line)) {
+        memmove(line, line + 1, strlen(line));
+    }
+
+    // right trim
+    int len = strlen(line);
+    while (len > 0 && isspace((unsigned char)line[len - 1])) {
+        line[len - 1] = '\0';
+        len--;
+    }
+}
+
+// -------------------------
+// Extract G or M code
+// -------------------------
+int get_gcode(char *line)
+{
+    int g;
+    if (sscanf(line, "G%d", &g) == 1) return g;
+    return -1;
+}
+
+int get_mcode(char *line)
+{
+    int m;
+    if (sscanf(line, "M%d", &m) == 1) return m;
+    return -1;
+}
+
+void process_line(char *line)
+{
+    strip_comment(line);
+    trim(line);
+
+    if (strlen(line) == 0)
+        return;
+
+    int g = get_gcode(line);
+    int m = get_mcode(line);
+
+    // -------------------------
+    // G-code handling
+    // -------------------------
+    if (g != -1)
+    {
+        if (g == 0 || g == 1)
+        {
+            handle_linear_motion(line);
+        }
+        else if (g == 2 || g == 3)
+        {
+            handle_arcs(line);
+        }
+        else if (g == 4)
+        {
+            float p;
+            if (sscanf(line, "G4 P%f", &p) == 1)
+                printf("Dwell for %.2f\n", p);
+        }
+        else if (g == 20 || g == 21 || g == 90 || g == 91 || g == 28)
+        {
+            handle_modes(line);
+        }
+
+        return;
+    }
+
+    // -------------------------
+    // M-code handling
+    // -------------------------
+    if (m != -1)
+    {
+        handle_spindle(line);
+    }
+}
+
+// =======================================================
+// GROUP HANDLERS
+// =======================================================
+
+// -------------------------
+// Linear motion (G0 / G1)
+// -------------------------
+void handle_linear_motion(char *line)
+{
+    int x, y, z;
+    float f = state.feedrate;
+
+    int has_xyz = sscanf(line, "%*s X%d Y%d Z%d", &x, &y, &z);
+
+    if (has_xyz >= 2)
+    {
+        if (strstr(line, "F")) {
+            sscanf(line, "%*s X%d Y%d Z%d F%f", &x, &y, &z, &f);
+        }
+
+        if (strstr(line, "G0")) {
+            // rapid move
+            printf("Rapid move to %d %d %d\n", x, y, z);
+        } else {
+            // linear move
+            printf("Linear move to %d %d %d F%.2f\n", x, y, z, f);
+        }
+    }
+}
+
+// -------------------------
+// Arc motion (G2 / G3)
+// -------------------------
+void handle_arcs(char *line)
+{
+    int x, y, i, j;
+
+    if (sscanf(line, "%*s X%d Y%d I%d J%d", &x, &y, &i, &j) == 4)
+    {
+        if (strstr(line, "G2")) {
+            printf("CW Arc to %d %d center %d %d\n", x, y, i, j);
+        } else {
+            printf("CCW Arc to %d %d center %d %d\n", x, y, i, j);
+        }
+    }
+}
+
+// -------------------------
+// Modes (G20/21/90/91/28)
+// -------------------------
+void handle_modes(char *line)
+{
+    int g;
+    if (sscanf(line, "G%d", &g) != 1) return;
+
+    switch (g)
+    {
+        case 20:
+            state.units_mm = 0;
+            printf("Units: inches\n");
+            break;
+
+        case 21:
+            state.units_mm = 1;
+            printf("Units: mm\n");
+            break;
+
+        case 90:
+            state.absolute_mode = 1;
+            printf("Absolute mode\n");
+            break;
+
+        case 91:
+            state.absolute_mode = 0;
+            printf("Relative mode\n");
+            break;
+
+        case 28:
+            printf("Homing cycle\n");
+            break;
+    }
+}
+
+// -------------------------
+// Spindle (M3 / M5)
+// -------------------------
+void handle_spindle(char *line)
+{
+    int m;
+    if (sscanf(line, "M%d", &m) != 1) return;
+
+    if (m == 3) {
+        printf("Spindle ON (CW)\n");
+    }
+    else if (m == 5) {
+        printf("Spindle OFF\n");
+    }
+}
 
 void calibrate_position() {
   while (gpio_get(XLIMIT_PIN)) {
@@ -155,18 +355,11 @@ void process_input() {
 
 void handle_command_mode() {
   process_input();
-  // if (command_complete) {
-  //   if (3 == sscanf(command, "G00 X%i Y%i Z%i", &next_coords[XDIM], &next_coords[YDIM], &next_coords[ZDIM])) {
-  //     // Move to coords x,y,z no microstepping
-  //   }
-  //   else if (3 <= sscanf(command, "G01 X%i Y%i Z%i F%i", &next_coords[XDIM], &next_coords[YDIM], &next_coords[ZDIM], &feed_rate)) {
-  //     // Move to coords x,y,z (F is optional)
-  //   }
-  //   else if (1 == sscanf(command, "G04 P%f")) {
 
-  //   }
-  //   else if ()
-  // }
+  if (command_complete) {
+    process_line(command);
+    command_complete = false;
+  }
 }
 
 int main(void) {
