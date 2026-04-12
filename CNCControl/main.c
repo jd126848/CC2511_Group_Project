@@ -14,7 +14,6 @@
 
 #define COMMAND_BUFFER_SIZE 64
 #define NUMSPEEDS 5
-#define STEPS_PER_MM 50
 
 const int spindle_pwm_levels[NUMSPEEDS] = {0, 64, 128, 192, 256};
 
@@ -105,7 +104,7 @@ int get_mcode(char *line)
 // -------------------------
 void handle_linear_motion(char *line, int g)
 {
-  float x = 0, y = 0, z = 0, f = state.feedrate;
+  float x = state.current_coords[XDIM], y = state.current_coords[YDIM], z = state.current_coords[ZDIM], f = state.feedrate;
   // float f = state.feedrate;
 
   // int has_xyz = sscanf(line, "%*s X%d Y%d Z%d", &x, &y, &z);
@@ -125,7 +124,8 @@ void handle_linear_motion(char *line, int g)
   }
   else {
     // linear move
-    printf("Linear move to %f %f %f F%.2f\n", x, y, z, f);      
+    printf("Linear move to %f %f %f F%.2f\n", x, y, z, f);
+    mmhal_step_motors(x-state.current_coords[XDIM],y-state.current_coords[YDIM],z-state.current_coords[ZDIM]);
   }
 
   // if (has_xyz >= 2)
@@ -420,6 +420,7 @@ void handle_manual_mode() {
         break;
       case '\033': // escape character
         manual_mode = false;
+        printf("Command Mode:\r\n");
         break;
       case 'c':
         calibrate_position();
@@ -436,12 +437,17 @@ void process_input() {
   int ch = getchar_timeout_us(0);
   if ( ch != PICO_ERROR_TIMEOUT ) {
     switch (ch) {
+      case '\033': // escape character
+        manual_mode = true;
+        printf("Manual Mode:\r\n");
+        break;
       case '\r':
       case '\n':
         command[command_index] = 0;
         printf("\n");
         command_index = 0;
         command_complete = true;
+        printf("%s", command);
         break;
       
       case '\b':
@@ -487,8 +493,13 @@ int main(void) {
   stdio_init_all();
   mmhal_init();
 
+  while (!stdio_usb_connected) {
+    sleep_ms(100);
+  }
+  printf("hi\r\n");
   while (true) {
     //  Repeated code here
+
     if (manual_mode) {
       handle_manual_mode();
       }

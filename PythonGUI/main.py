@@ -18,10 +18,9 @@ class CNCApp(App):
         self.gcode_lines = None
         self.ser = serial.Serial(port=PORT, baudrate=115200, timeout=0)
         self.coords = [0,0,0]
+        self.microsteps = 1
+        self.drill_speed = 0
         Clock.schedule_interval(self.read_serial, 0.05)
-
-
-
 
 
     def on_stop(self):
@@ -48,7 +47,14 @@ class CNCApp(App):
         self.ser.write(command.encode())
         print(command)
 
-    def set_spinner_speed(self):
+    def set_spindle_speed(self):
+        values = self.root.ids.spindle_speed_spinner.values
+        new_speed = values.index(self.root.ids.spindle_speed_spinner.text)
+        if new_speed > self.drill_speed:
+            self.send_serial("+" * (new_speed-self.drill_speed))
+        else:
+            self.send_serial("-" * (self.drill_speed-new_speed))
+        self.drill_speed = new_speed
         print(self.root.ids.spindle_speed_spinner.text)
 
     def set_microsteps(self):

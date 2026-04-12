@@ -180,13 +180,69 @@ void mmhal_step_motors_impl(int dirs[])
   // TODO - Implement the timing for the step pulses, using
   // mmhal_high_delay_us and mmhal_low_delay_us for the pulse timing
 }
+void bresenham_step(int x1, int y1)
+{
+    int dx = abs(x1);
+    int dy = abs(y1);
+
+    int sx = (x1 > 0) ? 1 : -1;
+    int sy = (y1 > 0) ? 1 : -1;
+
+    int diff = dx - dy;
+
+    int x = 0;
+    int y = 0;
+
+    while (x != x1 || y != y1)
+    {
+        int D = 2 * diff;
+
+        int step_x = 0;
+        int step_y = 0;
+
+        if (D > -dy) {
+            diff -= dy;
+            x += sx;
+            step_x = sx;
+        }
+
+        if (D < dx) {
+            diff += dx;
+            y += sy;
+            step_y = sy;
+        }
+        int step_dir[3] = {step_x, step_y, 0};
+        mmhal_step_motors_impl(step_dir);
+        printf("%d, %d\r\n", step_x, step_y);
+    }
+}
 
 void mmhal_step_motors(int x_dir, int y_dir, int z_dir)
 {
-  int dirs[3] = {x_dir, y_dir, z_dir};
-  for (size_t i = 0; i < 50; i++)
-  {
-    /* code */
-    mmhal_step_motors_impl(dirs);
+  int dirs[3] = {x_dir * STEPS_PER_MM, y_dir * STEPS_PER_MM, z_dir * STEPS_PER_MM};
+  if ((x_dir == 0 && y_dir == 0) || (x_dir == 0 && z_dir == 0) || (y_dir == 0 && z_dir == 0)) {
+    int steps, step_dir[3] = {0,0,0};
+    if (dirs[XDIM] !=0) {
+      steps = dirs[XDIM];
+      step_dir[XDIM] = (steps > 0) ? 1 : -1;
+    }
+    else if (dirs[YDIM] !=0) {
+      steps = dirs[YDIM];
+      step_dir[YDIM] = (steps > 0) ? 1 : -1;
+    }
+    else if (dirs[ZDIM] !=0) {
+      steps = dirs[ZDIM];
+      step_dir[ZDIM] = (steps > 0) ? 1 : -1;
+    }
+    for (size_t i = 0; i < abs(steps); i++) {
+      mmhal_step_motors_impl(step_dir);
+    }
   }
+  else {
+    bresenham_step(dirs[XDIM], dirs[YDIM]);
+    dirs[XDIM] = 0; 
+    dirs[YDIM] = 0;
+    mmhal_step_motors_impl(dirs);
+  } 
 }
+
