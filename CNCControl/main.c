@@ -11,6 +11,7 @@
 #include "hardware/pwm.h"
 #include "mmhal.h"
 #include <ctype.h>
+#include <math.h>
 
 #define COMMAND_BUFFER_SIZE 64
 #define NUMSPEEDS 5
@@ -164,6 +165,7 @@ void handle_arcs(char *line)
   // {
   if (strstr(line, "G2")) {
       printf("CW Arc to %f %f center %f %f\n", x, y, i, j);
+      mmhal_move_arc(x-state.current_coords[XDIM], y-state.current_coords[YDIM], i-state.current_coords[XDIM], j-state.current_coords[YDIM], true);
   } else {
       printf("CCW Arc to %f %f center %f %f\n", x, y, i, j);
   }

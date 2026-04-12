@@ -8,6 +8,8 @@
 #define CNC_VERSION 2
 #endif
 
+#define FP_SHIFT 10
+#define FP_SCALE (1 << FP_SHIFT)
 
 // Pin numbers arrays
 const int step_pins[] = {XSTEP_PIN, YSTEP_PIN, ZSTEP_PIN};
@@ -246,3 +248,45 @@ void mmhal_step_motors(int x_dir, int y_dir, int z_dir)
   } 
 }
 
+void mmhal_move_arc(float x, float y, float i, float j, bool CW) {
+  int x0 = 0;
+  int y0 = 0;
+
+  int x1 = x * STEPS_PER_MM;
+  int y1 = y * STEPS_PER_MM;
+
+  int cx = x0 + i * STEPS_PER_MM;
+  int cy = y0 + j * STEPS_PER_MM;
+
+  float dx = x0 - cx;
+  float dy = y0 - cy;
+
+  float delta = 0.05;
+  float cos_d = 1 - delta*delta/2;
+  float sin_d = delta - delta*delta*delta/6;
+
+  if (CW) sin_d = -sin_d;
+
+  int xpos = x0;
+  int ypos = y0;
+
+  for (int k = 0; k < 200; k++)
+  {
+      float dx_new = dx * cos_d - dy * sin_d;
+      float dy_new = dx * sin_d + dy * cos_d;
+
+      dx = dx_new;
+      dy = dy_new;
+
+      int new_x = cx + (int)dx;
+      int new_y = cy + (int)dy;
+
+      mmhal_step_motors(new_x - xpos, new_y - ypos, 0);
+
+      xpos = new_x;
+      ypos = new_y;
+
+      if (abs(new_x - x1) < 2 && abs(new_y - y1) < 2)
+          break;
+  }
+}
