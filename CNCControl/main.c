@@ -171,42 +171,6 @@ void handle_arcs(char *line)
 }
 
 // -------------------------
-// Modes (G20/21/90/91/28)
-// -------------------------
-void handle_modes(char *line)
-{
-    int g;
-    if (sscanf(line, "G%d", &g) != 1) return;
-
-    switch (g)
-    {
-        case 20:
-            state.units_mm = 0;
-            printf("Units: inches\n");
-            break;
-
-        case 21:
-            state.units_mm = 1;
-            printf("Units: mm\n");
-            break;
-
-        case 90:
-            state.absolute_mode = 1;
-            printf("Absolute mode\n");
-            break;
-
-        case 91:
-            state.absolute_mode = 0;
-            printf("Relative mode\n");
-            break;
-
-        case 28:
-            printf("Homing cycle\n");
-            break;
-    }
-}
-
-// -------------------------
 // Spindle (M3 / M5)
 // -------------------------
 void handle_spindle(char *line)
@@ -241,44 +205,61 @@ void process_line(char *line)
   {
     switch (g)
     {
-    case 0: case 1:
+    case 0: case 1: // Linear moves
       handle_linear_motion(line, g);
       break;
 
-    case 2: case 3:
+    case 2: case 3: // Arc moves
       handle_arcs(line);
       break;
 
-    case 4: {
-      float p;
-      if (sscanf(line, "G4 P%f", &p) == 1)
+    case 4: {  // Dwell
+      float p = 0;
+      char *ptr = line;
+
+      while (*ptr) {
+        if (*ptr == 'P') sscanf(ptr + 1, "%f", &p);
+        ptr++;
+      }
+      if (sscanf(line, "G4 P%f", &p) == 1) {
           printf("Dwell for %.2f\n", p);
+          sleep_ms((uint32_t)(p * 1000));
+      }
       break;
     }
 
-    case 20:
+    case 20:  // Units: mm
       state.units_mm = false;
       printf("Units: inches\n");
       break;
 
-    case 21:
+    case 21:  // Units: inches
       state.units_mm = true;
       printf("Units: mm\n");
       break;
 
-    case 90:
+    case 90: // Absolute coordinates
       state.absolute_mode = true;
       printf("Absolute mode\n");
       break;
 
-    case 91:
+    case 91: // Relative coordinates
       state.absolute_mode = false;
       printf("Relative mode\n");
       break;
 
-    case 28:
-      printf("Homing cycle\n");
-      break;
+    case 28: { // Homing cycle
+        char *gptr = strchr(line, 'G');
+
+        if (gptr && strstr(gptr, ".1") == gptr + 3) {
+            // G28.1 exactly
+            printf("G28.1 → set home\n");
+        } else {
+            // G28
+            printf("G28 → go home\n");
+        }
+        break;
+    }
 
     default:
       break;
