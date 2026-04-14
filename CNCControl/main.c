@@ -16,7 +16,7 @@
 #define COMMAND_BUFFER_SIZE 64
 #define NUMSPEEDS 5
 
-const int spindle_pwm_levels[NUMSPEEDS] = {0, 64, 128, 192, 256};
+const int spindle_pwm_levels[NUMSPEEDS] = {0, 64, 128, 192, 255};
 
 bool manual_mode = true; // Start in manual mode for testing
 
@@ -32,24 +32,13 @@ typedef struct {
   bool absolute_mode;   // G90 = 1, G91 = 0
   bool units_mm;        // G21 = 1, G20 = 0
   float feedrate;
-  float current_coords[3];
-  float home_coords[3];
-  int corner_coords[3];
+  int current_coords[3];
+  int home_coords[3];
   int spindle_speed;
   int microsteps;
 } MachineState;
 
 MachineState state;
-
-
-int distance_to_steps(float distance) {
-  if (state.units_mm) {
-    return distance*state.microsteps/STEPS_PER_MM;
-  }
-  else {
-    return distance*25.4*state.microsteps/STEPS_PER_MM; // 25.4mm/inch
-  }
-}
 
 
 // -------------------------
@@ -105,10 +94,8 @@ int get_mcode(char *line)
 // -------------------------
 void handle_linear_motion(char *line, int g)
 {
-  float x = state.current_coords[XDIM], y = state.current_coords[YDIM], z = state.current_coords[ZDIM], f = state.feedrate;
-  // float f = state.feedrate;
-
-  // int has_xyz = sscanf(line, "%*s X%d Y%d Z%d", &x, &y, &z);
+  int scale = (state.units_mm) ? STEPS_PER_MM : STEPS_PER_INCH;
+  float x = (float)state.current_coords[XDIM]/scale, y = (float)state.current_coords[YDIM]/scale, z = (float)state.current_coords[ZDIM]/scale, f = state.feedrate;
 
   char *ptr = line;
   while (*ptr) {
@@ -119,35 +106,34 @@ void handle_linear_motion(char *line, int g)
     ptr++;
   }
 
+  
+  
+  int dx,dy,dz;
+  if (state.absolute_mode) {
+    dx = x*scale-state.current_coords[XDIM];
+    dy = y*scale-state.current_coords[YDIM];
+    dz = z*scale-state.current_coords[ZDIM];
+  } else {
+    dx = x*scale;
+    dy = y*scale;
+    dz = z*scale;
+  }
+
   if (g == 0) {
     // rapid move
     printf("Rapid move to %f %f %f\n", x, y, z);
+    mmhal_step_motors(dx,dy,dz,state.current_coords);
+
   }
   else {
     // linear move
     printf("Linear move to %f %f %f F%.2f\n", x, y, z, f);
-    mmhal_step_motors(x-state.current_coords[XDIM],y-state.current_coords[YDIM],z-state.current_coords[ZDIM]);
+    mmhal_step_motors(dx,dy,dz,state.current_coords);
   }
-
-  // if (has_xyz >= 2)
-  // {
-  //     if (strstr(line, "F")) {
-  //         sscanf(line, "%*s X%d Y%d Z%d F%f", &x, &y, &z, &f);
-  //     }
-
-  //     if (strstr(line, "G0")) {
-  //         // rapid move
-  //         printf("Rapid move to %d %d %d\n", x, y, z);
-  //     } else {
-  //         // linear move
-  //         printf("Linear move to %d %d %d F%.2f\n", x, y, z, f);
-  //     }
-  // }
 }
 
-// -------------------------
+
 // Arc motion (G2 / G3)
-// -------------------------
 void handle_arcs(char *line)
 {
   float x = 0, y = 0, i = 0, j = 0;
@@ -161,31 +147,46 @@ void handle_arcs(char *line)
   }
 
 
-  // if (sscanf(line, "%*s X%f Y%f I%f J%f", &x, &y, &i, &j) == 4)
-  // {
-  if (strstr(line, "G2")) {
+  int scale = (state.units_mm) ? STEPS_PER_MM : STEPS_PER_INCH;
+  
+  int Xfin,Yfin,Xoff,Yoff;
+  if (state.absolute_mode) {
+    Xfin = x*scale-state.current_coords[XDIM];
+    Yfin = y*scale-state.current_coords[YDIM];
+    Xoff = i*scale;
+    Yoff = j*scale;
+  } else {
+    Xfin = x*scale;
+    Yfin = y*scale;
+    Xoff = i*scale;
+    Yoff = j*scale;
+  }
+
+  if (strstr(line, "G2") || strstr(line, "G02")) {
       printf("CW Arc to %f %f center %f %f\n", x, y, i, j);
-      mmhal_move_arc(x-state.current_coords[XDIM], y-state.current_coords[YDIM], i-state.current_coords[XDIM], j-state.current_coords[YDIM], true);
+      mmhal_move_arc(Xfin, Yfin, Xoff, Yoff, true, state.current_coords);
   } else {
       printf("CCW Arc to %f %f center %f %f\n", x, y, i, j);
+      mmhal_move_arc(Xfin, Yfin, Xoff, Yoff, false, state.current_coords);
   }
-  // }
 }
 
-// -------------------------
-// Spindle (M3 / M5)
-// -------------------------
+
+
+// Spindle
 void handle_spindle(char *line)
 {
-    int m;
-    if (sscanf(line, "M%d", &m) != 1) return;
+  int m;
+  if (sscanf(line, "M%d", &m) != 1) return;
 
-    if (m == 3) {
-        printf("Spindle ON (CW)\n");
-    }
-    else if (m == 5) {
-        printf("Spindle OFF\n");
-    }
+  if (m == 3) {
+    printf("Spindle ON\n");
+    mmhal_set_spindle_pwm(256);
+  }
+  else if (m == 5) {
+    printf("Spindle OFF\n");
+    mmhal_set_spindle_pwm(0);
+  }
 }
 
 
@@ -207,120 +208,88 @@ void process_line(char *line)
   {
     switch (g)
     {
-    case 0: case 1: // Linear moves
+    case 0: case 1: // Linear Movement // Linear moves
       handle_linear_motion(line, g);
       break;
 
-    case 2: case 3: // Arc moves
+    case 2: case 3: // Arc Movement
       handle_arcs(line);
       break;
 
-    case 4: {  // Dwell
-      float p = 0;
-      char *ptr = line;
-
-      while (*ptr) {
-        if (*ptr == 'P') sscanf(ptr + 1, "%f", &p);
-        ptr++;
-      }
-      if (sscanf(line, "G4 P%f", &p) == 1) {
-          printf("Dwell for %.2f\n", p);
-          sleep_ms((uint32_t)(p * 1000));
+    case 4: { // dwell
+      float p;
+      if (sscanf(line, "G%*d P%f", &p) == 1) {
+        printf("Dwell for %.2f\n", p);
+        sleep_ms((uint32_t)(p * 1000));
       }
       break;
     }
 
-    case 20:  // Units: mm
+    case 20: // units: inches
       state.units_mm = false;
       printf("Units: inches\n");
       break;
 
-    case 21:  // Units: inches
+    case 21: // units: mm
       state.units_mm = true;
       printf("Units: mm\n");
       break;
 
-    case 90: // Absolute coordinates
+    case 90: // Absolute coords
       state.absolute_mode = true;
       printf("Absolute mode\n");
       break;
 
-    case 91: // Relative coordinates
+    case 91: // relative coords
       state.absolute_mode = false;
       printf("Relative mode\n");
       break;
 
-    case 28: { // Homing cycle
-        char *gptr = strchr(line, 'G');
+    case 28:
+      if (strstr(line, "G28.1") != NULL) {
+        printf("Home Set\r\n");
+        state.home_coords[XDIM] = state.current_coords[XDIM];
+        state.home_coords[YDIM] = state.current_coords[YDIM];
+        state.home_coords[ZDIM] = state.current_coords[ZDIM];
+      } else {
+        mmhal_step_motors(state.home_coords[XDIM]-state.current_coords[XDIM], state.home_coords[YDIM]-state.current_coords[YDIM], state.home_coords[ZDIM]-state.current_coords[ZDIM], state.current_coords);
+      }
 
-        if (gptr && strstr(gptr, ".1") == gptr + 3) {
-            // G28.1 exactly
-            printf("G28.1 → set home\n");
-        } else {
-            // G28
-            printf("G28 → go home\n");
-        }
-        break;
-    }
+      break;
 
     default:
       break;
     }
-      // if (g == 0 || g == 1)
-      // {
-      //     handle_linear_motion(line);
-      // }
-      // else if (g == 2 || g == 3)
-      // {
-      //     handle_arcs(line);
-      // }
-      // else if (g == 4)
-      // {
-      //     float p;
-      //     if (sscanf(line, "G4 P%f", &p) == 1)
-      //         printf("Dwell for %.2f\n", p);
-      // }
-      // else if (g == 20 || g == 21 || g == 90 || g == 91 || g == 28)
-      // {
-      //     handle_modes(line);
-      // }
-
-      return;
   }
 
-  // -------------------------
   // M-code handling
-  // -------------------------
   if (m != -1)
   {
-      handle_spindle(line);
+    handle_spindle(line);
   }
 }
 
 
-
-
-
-
-
-
 void calibrate_position() {
+  int xCalDir[3] = {-1,0,0};
+  int yCalDir[3] = {0,-1,0};
+  int zCalDir[3] = {0,0,1};
   while (gpio_get(XLIMIT_PIN)) {
-    mmhal_step_motors(-1,0,0);
+    mmhal_step_motors_impl(xCalDir, state.current_coords, true);
   }
-  state.corner_coords[XDIM] = 0;
+  state.current_coords[XDIM] = 0;
   printf("X-Limit Reached\r\n");
 
   while (gpio_get(YLIMIT_PIN)) {
-    mmhal_step_motors(0,-1,0);
+    mmhal_step_motors_impl(yCalDir, state.current_coords, true);
   }
-  state.corner_coords[YDIM] = 0;
+  state.current_coords[YDIM] = 0;
   printf("Y-Limit Reached\r\n");
 
   while (gpio_get(ZLIMIT_PIN)) {
-    mmhal_step_motors(0,0,-1);
+    mmhal_step_motors_impl(zCalDir, state.current_coords, true);
   }
-  state.corner_coords[ZDIM] = 0;
+  state.current_coords[ZDIM] = Z_LIMIT;
   printf("Z-Limit Reached\r\n");
 }
 
@@ -330,24 +299,25 @@ void handle_manual_mode() {
   int ch = getchar_timeout_us(0);
   if (ch != PICO_ERROR_TIMEOUT) {
     printf("%c\r\n", ch);
+    const int steps_per_press = 35;
     switch (ch) {
       case 'a':
-        mmhal_step_motors(-1,0,0);
+        mmhal_step_motors(-steps_per_press,0,0, state.current_coords);
         break;
       case 'd':
-        mmhal_step_motors(1,0,0);
+        mmhal_step_motors(steps_per_press,0,0, state.current_coords);
         break;
       case 'w':
-        mmhal_step_motors(0,1,0);
+        mmhal_step_motors(0,steps_per_press,0, state.current_coords);
         break;
       case 's':
-        mmhal_step_motors(0,-1,0);
+        mmhal_step_motors(0,-steps_per_press,0, state.current_coords);
         break;
       case 'q':
-        mmhal_step_motors(0,0,-1);
+        mmhal_step_motors(0,0,-steps_per_press, state.current_coords);
         break;
       case 'e':
-        mmhal_step_motors(0,0,1);
+        mmhal_step_motors(0,0,steps_per_press, state.current_coords);
         break;
       case '=':
       case '+':
@@ -407,7 +377,7 @@ void handle_manual_mode() {
         break;
       case 'c':
         calibrate_position();
-        printf("%d,%d,%d", state.corner_coords[XDIM], state.corner_coords[YDIM], state.corner_coords[ZDIM]);
+        printf("%d,%d,%d", state.current_coords[XDIM], state.current_coords[YDIM], state.current_coords[ZDIM]);
         break;
       default:
         // printf("%d", ch);
@@ -464,9 +434,9 @@ int main(void) {
   // Initialise components and variables
   state.absolute_mode = true;
   state.units_mm = true;
-  state.corner_coords[XDIM] = 0;
-  state.corner_coords[YDIM] = 0;
-  state.corner_coords[ZDIM] = 0;
+  state.current_coords[XDIM] = 0;
+  state.current_coords[YDIM] = 0;
+  state.current_coords[ZDIM] = Z_LIMIT;
   state.home_coords[XDIM] = X_LIMIT / 2;
   state.home_coords[YDIM] = Y_LIMIT / 2;
   state.home_coords[ZDIM] = Z_LIMIT / 2;

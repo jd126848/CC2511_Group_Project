@@ -2,7 +2,7 @@
 #include "pico/stdlib.h"
 #include "hardware/pwm.h"
 
-#define CNC_VERSION 1
+// #define CNC_VERSION 1
 
 #ifndef CNC_VERSION
 #define CNC_VERSION 2
@@ -17,9 +17,9 @@ const int dir_pins[] = {XDIR_PIN, YDIR_PIN, ZDIR_PIN};
 
 // Multipliers for each axis, dealing with assymetric stepper directions
 #if CNC_VERSION == 1
-const int stepper_multipliers[] = {-1, 1, 1};
+const int stepper_multipliers[] = {-1, 1, -1};
 #elif CNC_VERSION == 2
-const int stepper_multipliers[] = {1, 1, 1};
+const int stepper_multipliers[] = {-1, 1, -1};
 #else
 #error "Invalid CNC_VERSION"
 #endif
@@ -121,14 +121,26 @@ void mmhal_set_microstepping(int x_or_y, mmhal_microstep_mode_t mode)
  * @param dirs Array of 3 directions: -1 for negative,
  * 0 for no movement, 1 for positive
  */
-void mmhal_step_motors_impl(int dirs[])
+void mmhal_step_motors_impl(int dirs[3], int currentCoords[3], bool ignoreLimits)
 {
-  // printf("%d x, %d y, %d z\r\n", dirs[XDIM], dirs[YDIM], dirs[ZDIM]);
   int xDir = dirs[XDIM] * stepper_multipliers[XDIM];
   int yDir = dirs[YDIM] * stepper_multipliers[YDIM];
   int zDir = dirs[ZDIM] * stepper_multipliers[ZDIM];
 
+  if (!ignoreLimits) {
+    printf("%d,%d,%d - %d,%d,%d\r\n", xDir,yDir,zDir, currentCoords[XDIM],currentCoords[YDIM],currentCoords[ZDIM]);
+    if (dirs[XDIM] == 1 && currentCoords[XDIM] >= X_LIMIT) return;
+    if (dirs[XDIM] == -1 && currentCoords[XDIM] <= 0) return;
+    if (dirs[YDIM] == 1 && currentCoords[YDIM] >= Y_LIMIT) return;
+    if (dirs[YDIM] == -1 && currentCoords[YDIM] <= 0) return;
+    if (dirs[ZDIM] == 1 && currentCoords[ZDIM] >= Z_LIMIT) return;
+    if (dirs[ZDIM] == -1 && currentCoords[ZDIM] <= 0) return;
+  }
+
+  
+
   if (xDir == 1) {
+    currentCoords[XDIM] += stepper_multipliers[XDIM];
     gpio_put(XDIR_PIN, 1);
     gpio_put(XSTEP_PIN, 1);
     sleep_us(mmhal_high_delay_us);
@@ -136,6 +148,7 @@ void mmhal_step_motors_impl(int dirs[])
     sleep_us(mmhal_low_delay_us);
   }
   else if (xDir == -1) {
+    currentCoords[XDIM] -= stepper_multipliers[XDIM];
     gpio_put(XDIR_PIN, 0);
     gpio_put(XSTEP_PIN, 1);
     sleep_us(mmhal_high_delay_us);
@@ -144,6 +157,7 @@ void mmhal_step_motors_impl(int dirs[])
   }
 
   if (yDir == 1) {
+    currentCoords[YDIM] += stepper_multipliers[YDIM];
     gpio_put(YDIR_PIN, 1);
     gpio_put(YSTEP_PIN, 1);
     sleep_us(mmhal_high_delay_us);
@@ -151,6 +165,7 @@ void mmhal_step_motors_impl(int dirs[])
     sleep_us(mmhal_low_delay_us);
   }
   else if (yDir == -1) {
+    currentCoords[YDIM] -= stepper_multipliers[YDIM];
     gpio_put(YDIR_PIN, 0);
     gpio_put(YSTEP_PIN, 1);
     sleep_us(mmhal_high_delay_us);
@@ -159,6 +174,7 @@ void mmhal_step_motors_impl(int dirs[])
   }
   
   if (zDir == 1) {
+    currentCoords[ZDIM] += stepper_multipliers[ZDIM];
     gpio_put(ZDIR_PIN, 1);
     gpio_put(ZSTEP_PIN, 1);
     sleep_us(mmhal_high_delay_us);
@@ -166,6 +182,7 @@ void mmhal_step_motors_impl(int dirs[])
     sleep_us(mmhal_low_delay_us);
   }
   else if (zDir == -1) {
+    currentCoords[ZDIM] -= stepper_multipliers[ZDIM];
     gpio_put(ZDIR_PIN, 0);
     gpio_put(ZSTEP_PIN, 1);
     sleep_us(mmhal_high_delay_us);
@@ -182,7 +199,7 @@ void mmhal_step_motors_impl(int dirs[])
   // TODO - Implement the timing for the step pulses, using
   // mmhal_high_delay_us and mmhal_low_delay_us for the pulse timing
 }
-void bresenham_step(int x1, int y1)
+void bresenham_step(int x1, int y1, int currentCoords[3])
 {
     int dx = abs(x1);
     int dy = abs(y1);
@@ -197,32 +214,33 @@ void bresenham_step(int x1, int y1)
 
     while (x != x1 || y != y1)
     {
-        int D = 2 * diff;
+      if (getchar_timeout_us(0) == ' ') break;
+      int D = 2 * diff;
 
-        int step_x = 0;
-        int step_y = 0;
+      int step_x = 0;
+      int step_y = 0;
 
-        if (D > -dy) {
-            diff -= dy;
-            x += sx;
-            step_x = sx;
-        }
+      if (D > -dy) {
+          diff -= dy;
+          x += sx;
+          step_x = sx;
+      }
 
-        if (D < dx) {
-            diff += dx;
-            y += sy;
-            step_y = sy;
-        }
-        int step_dir[3] = {step_x, step_y, 0};
-        mmhal_step_motors_impl(step_dir);
-        printf("%d, %d\r\n", step_x, step_y);
+      if (D < dx) {
+          diff += dx;
+          y += sy;
+          step_y = sy;
+      }
+      int step_dir[3] = {step_x, step_y, 0};
+      mmhal_step_motors_impl(step_dir, currentCoords, false);
+      printf("%d, %d\r\n", step_x, step_y);
     }
 }
 
-void mmhal_step_motors(int x_dir, int y_dir, int z_dir)
+void mmhal_step_motors(int dx, int dy, int dz, int currentCoords[3])
 {
-  int dirs[3] = {x_dir * STEPS_PER_MM, y_dir * STEPS_PER_MM, z_dir * STEPS_PER_MM};
-  if ((x_dir == 0 && y_dir == 0) || (x_dir == 0 && z_dir == 0) || (y_dir == 0 && z_dir == 0)) {
+  int dirs[3] = {dx, dy, dz};
+  if ((dx == 0 && dy == 0) || (dx == 0 && dz == 0) || (dy == 0 && dz == 0)) {
     int steps, step_dir[3] = {0,0,0};
     if (dirs[XDIM] !=0) {
       steps = dirs[XDIM];
@@ -237,56 +255,96 @@ void mmhal_step_motors(int x_dir, int y_dir, int z_dir)
       step_dir[ZDIM] = (steps > 0) ? 1 : -1;
     }
     for (size_t i = 0; i < abs(steps); i++) {
-      mmhal_step_motors_impl(step_dir);
+      if (getchar_timeout_us(0) == ' ') break;
+      mmhal_step_motors_impl(step_dir, currentCoords, false);
     }
   }
   else {
-    bresenham_step(dirs[XDIM], dirs[YDIM]);
-    dirs[XDIM] = 0; 
-    dirs[YDIM] = 0;
-    mmhal_step_motors_impl(dirs);
+    bresenham_step(dirs[XDIM], dirs[YDIM], currentCoords);
+    int step_dir[3] = {0,0,0};
+    step_dir[ZDIM] = (dirs[ZDIM] > 0) ? 1 : -1;
+    for (size_t i = 0; i < abs(dirs[ZDIM]); i++)
+    {
+      if (getchar_timeout_us(0) == ' ') break;
+      mmhal_step_motors_impl(step_dir, currentCoords, false);
+    }
   } 
 }
 
-void mmhal_move_arc(float x, float y, float i, float j, bool CW) {
-  int x0 = 0;
-  int y0 = 0;
+void mmhal_move_arc(int x1, int y1, int i, int j, bool CW, int currentCoords[3])
+{
+  int cx = i;
+  int cy = j;
 
-  int x1 = x * STEPS_PER_MM;
-  int y1 = y * STEPS_PER_MM;
+  int x = -cx;
+  int y = -cy;
 
-  int cx = x0 + i * STEPS_PER_MM;
-  int cy = y0 + j * STEPS_PER_MM;
+  int xpos = 0;
+  int ypos = 0;
 
-  float dx = x0 - cx;
-  float dy = y0 - cy;
+  int ex = x1 - cx;
+  int ey = y1 - cy;
 
-  float delta = 0.05;
-  float cos_d = 1 - delta*delta/2;
-  float sin_d = delta - delta*delta*delta/6;
+  int r2 = x*x + y*y;
 
-  if (CW) sin_d = -sin_d;
+  int dirs[8][2] = {
+    {1,0},{1,1},{0,1},{-1,1},
+    {-1,0},{-1,-1},{0,-1},{1,-1}
+  };
 
-  int xpos = x0;
-  int ypos = y0;
-
-  for (int k = 0; k < 200; k++)
+  for (int iter = 0; iter < 10000; iter++)
   {
-      float dx_new = dx * cos_d - dy * sin_d;
-      float dy_new = dx * sin_d + dy * cos_d;
+    int px = cx + x;
+    int py = cy + y;
+    if (getchar_timeout_us(0) == ' ') break;
+    mmhal_step_motors(px - xpos, py - ypos, 0, currentCoords);
 
-      dx = dx_new;
-      dy = dy_new;
+    xpos = px;
+    ypos = py;
 
-      int new_x = cx + (int)dx;
-      int new_y = cy + (int)dy;
+    // stop near target
+    if (abs(x - ex) <= 1 && abs(y - ey) <= 1)
+      break;
 
-      mmhal_step_motors(new_x - xpos, new_y - ypos, 0);
+    int best_x = x;
+    int best_y = y;
+    int best_err = 1e9;
 
-      xpos = new_x;
-      ypos = new_y;
+    for (int k = 0; k < 8; k++)
+    {
+      if (getchar_timeout_us(0) == ' ') break;
+      int nx = x + dirs[k][0];
+      int ny = y + dirs[k][1];
 
-      if (abs(new_x - x1) < 2 && abs(new_y - y1) < 2)
-          break;
+      int err = abs(nx*nx + ny*ny - r2);
+
+      int step_cross = x*dirs[k][1] - y*dirs[k][0];
+
+      if (CW && step_cross > 0) continue;
+      if (!CW && step_cross < 0) continue;
+
+      if (err < best_err) {
+        best_err = err;
+        best_x = nx;
+        best_y = ny;
+      }
+    }
+
+    //prevent stall
+    if (best_x == x && best_y == y) {
+      if (CW) {
+        int tmp = x;
+        x = y;
+        y = -tmp;
+      } else {
+        int tmp = x;
+        x = -y;
+        y = tmp;
+      }
+      continue;
+    }
+
+    x = best_x;
+    y = best_y;
   }
 }
