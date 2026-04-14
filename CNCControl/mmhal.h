@@ -3,12 +3,13 @@
 
 #include <stdint.h>
 
-// Movement Limits (mm)
-#define X_LIMIT 300
-#define Y_LIMIT 175
-#define Z_LIMIT 43
+// Movement Limits (steps)
+#define X_LIMIT 15000 //* STEPS_PER_MM
+#define Y_LIMIT 7800// * STEPS_PER_MM
+#define Z_LIMIT 1800// * STEPS_PER_MM
 
 #define STEPS_PER_MM 50
+#define STEPS_PER_INCH 1270
 
 ///////////////////////////////////////////////////////////////////////
 // Pins
@@ -86,8 +87,9 @@ void mmhal_init();
  * @param x_dir -1 for negative, 0 for no movement, 1 for positive
  * @param y_dir -1 for negative, 0 for no movement, 1 for positive
  * @param z_dir -1 for negative, 0 for no movement, 1 for positive
+ * @param currentCoords array of current coordinates used to limit to edges
  */
-void mmhal_step_motors(int x_dir, int y_dir, int z_dir);
+void mmhal_step_motors(int x_dir, int y_dir, int z_dir, int currentCoords[3]);
 
 /**
  * @brief Set microstepping mode
