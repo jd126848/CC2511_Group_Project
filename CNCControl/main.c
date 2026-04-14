@@ -71,10 +71,17 @@ void trim(char *line)
 // -------------------------
 // Extract G or M code
 // -------------------------
-int get_gcode(char *line)
+int get_gcode(char *line, int*sub)
 {
     int g;
-    if (sscanf(line, "G%d", &g) == 1) return g;
+    *sub = -1;
+    if (sscanf(line, "G%d", &g) == 1) {
+        char *dot = strchr(line, '.');
+        char *space = strchr(line, ' ');
+      if (dot &&(!space || dot < space))
+        sscanf(dot + 1, "%d", sub);
+        return g;
+    }
     return -1;
 }
 
@@ -125,7 +132,7 @@ void handle_linear_motion(char *line, int g)
     mmhal_step_motors(dx,dy,dz,state.current_coords);
 
   }
-  else {
+  else if (g == 1) {
     // linear move
     printf("Linear move to %f %f %f F%.2f\n", x, y, z, f);
     mmhal_step_motors(dx,dy,dz,state.current_coords);
@@ -134,7 +141,7 @@ void handle_linear_motion(char *line, int g)
 
 
 // Arc motion (G2 / G3)
-void handle_arcs(char *line)
+void handle_arcs(char *line, int g)
 {
   float x = 0, y = 0, i = 0, j = 0;
   char *ptr = line;
@@ -162,10 +169,11 @@ void handle_arcs(char *line)
     Yoff = j*scale;
   }
 
-  if (strstr(line, "G2") || strstr(line, "G02")) {
+  if (g == 2) {
       printf("CW Arc to %f %f center %f %f\n", x, y, i, j);
       mmhal_move_arc(Xfin, Yfin, Xoff, Yoff, true, state.current_coords);
-  } else {
+  } 
+  else if (g == 3) {
       printf("CCW Arc to %f %f center %f %f\n", x, y, i, j);
       mmhal_move_arc(Xfin, Yfin, Xoff, Yoff, false, state.current_coords);
   }
@@ -174,14 +182,24 @@ void handle_arcs(char *line)
 
 
 // Spindle
-void handle_spindle(char *line)
+void handle_spindle(char *line, int m)
 {
-  int m;
-  if (sscanf(line, "M%d", &m) != 1) return;
+  int s = -1;
 
+  char *s_ptr = strchr(line, 'S');
+  if (s_ptr) {
+    sscanf(s_ptr + 1, "%d", &s);
+  }
+  
   if (m == 3) {
-    printf("Spindle ON\n");
-    mmhal_set_spindle_pwm(256);
+    if (s >= 0) {
+      printf("Spindle ON at speed %d\n", s);
+      mmhal_set_spindle_pwm(s);
+    } 
+    else {
+      printf("Spindle ON (default speed)\n");
+      mmhal_set_spindle_pwm(255);
+    }
   }
   else if (m == 5) {
     printf("Spindle OFF\n");
@@ -198,8 +216,15 @@ void process_line(char *line)
   if (strlen(line) == 0)
       return;
 
-  int g = get_gcode(line);
+  int sub = -1;
+  int g = get_gcode(line, &sub);
   int m = get_mcode(line);
+
+  // M-code handling
+  if (m != -1)
+  {
+    handle_spindle(line, m);
+  }
 
   // -------------------------
   // G-code handling
@@ -213,7 +238,7 @@ void process_line(char *line)
       break;
 
     case 2: case 3: // Arc Movement
-      handle_arcs(line);
+      handle_arcs(line, g);
       break;
 
     case 4: { // dwell
@@ -246,7 +271,7 @@ void process_line(char *line)
       break;
 
     case 28:
-      if (strstr(line, "G28.1") != NULL) {
+      if (sub == 1) {
         printf("Home Set\r\n");
         state.home_coords[XDIM] = state.current_coords[XDIM];
         state.home_coords[YDIM] = state.current_coords[YDIM];
@@ -260,12 +285,6 @@ void process_line(char *line)
     default:
       break;
     }
-  }
-
-  // M-code handling
-  if (m != -1)
-  {
-    handle_spindle(line);
   }
 }
 
