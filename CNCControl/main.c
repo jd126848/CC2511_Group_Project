@@ -244,7 +244,7 @@ void process_line(char *line)
     case 4: { // dwell
       float p;
       if (sscanf(line, "G%*d P%f", &p) == 1) {
-        printf("Dwell for %.2f\n", p);
+        printf("Dwell for %.2f seconds\n", p);
         sleep_ms((uint32_t)(p * 1000));
       }
       break;
