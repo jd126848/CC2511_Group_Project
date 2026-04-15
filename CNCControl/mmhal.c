@@ -128,7 +128,6 @@ void mmhal_step_motors_impl(int dirs[3], int currentCoords[3], bool ignoreLimits
   int zDir = dirs[ZDIM] * stepper_multipliers[ZDIM];
 
   if (!ignoreLimits) {
-    printf("%d,%d,%d - %d,%d,%d\r\n", xDir,yDir,zDir, currentCoords[XDIM],currentCoords[YDIM],currentCoords[ZDIM]);
     if (dirs[XDIM] == 1 && currentCoords[XDIM] >= X_LIMIT) return;
     if (dirs[XDIM] == -1 && currentCoords[XDIM] <= 0) return;
     if (dirs[YDIM] == 1 && currentCoords[YDIM] >= Y_LIMIT) return;
@@ -189,7 +188,7 @@ void mmhal_step_motors_impl(int dirs[3], int currentCoords[3], bool ignoreLimits
     gpio_put(ZSTEP_PIN, 0);
     sleep_us(mmhal_low_delay_us);
   }
-  
+  printf("POS X=%d Y=%d Z=%d\r\n", currentCoords[XDIM], currentCoords[YDIM], currentCoords[ZDIM]);
   
   // TODO - Implement motor stepping logic, using the dirs array
   // to determine which motors to step and in which direction
@@ -233,7 +232,7 @@ void bresenham_step(int x1, int y1, int currentCoords[3])
       }
       int step_dir[3] = {step_x, step_y, 0};
       mmhal_step_motors_impl(step_dir, currentCoords, false);
-      printf("%d, %d\r\n", step_x, step_y);
+      // printf("%d, %d\r\n", step_x, step_y);
     }
 }
 

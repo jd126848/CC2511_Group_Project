@@ -95,7 +95,18 @@ int get_mcode(char *line)
 void handle_linear_motion(char *line, int g)
 {
   int scale = (state.units_mm) ? STEPS_PER_MM : STEPS_PER_INCH;
-  float x = (float)state.current_coords[XDIM]/scale, y = (float)state.current_coords[YDIM]/scale, z = (float)state.current_coords[ZDIM]/scale, f = state.feedrate;
+  float x,y,z,f=state.feedrate =  f = state.feedrate;
+
+  if (state.absolute_mode) {
+    x = (float)state.current_coords[XDIM]/scale;
+    y = (float)state.current_coords[YDIM]/scale;
+    z = (float)state.current_coords[ZDIM]/scale;
+  }
+  else {
+    x = 0;
+    y = 0;
+    z = 0;
+  }
 
   char *ptr = line;
   while (*ptr) {
@@ -174,14 +185,18 @@ void handle_arcs(char *line)
 
 
 // Spindle
-void handle_spindle(char *line)
+void handle_spindle(char *line, int m)
 {
-  int m;
-  if (sscanf(line, "M%d", &m) != 1) return;
+  int s = 0;
+  char *ptr = line;
+  while (*ptr) {
+    if (*ptr == 'S') sscanf(ptr+1, "%d", &s);
+    ptr++;
+  }
 
   if (m == 3) {
-    printf("Spindle ON\n");
-    mmhal_set_spindle_pwm(256);
+    printf("Spindle ON at speed %d\n", s);
+    mmhal_set_spindle_pwm(s);
   }
   else if (m == 5) {
     printf("Spindle OFF\n");
@@ -192,8 +207,12 @@ void handle_spindle(char *line)
 
 void process_line(char *line)
 {
-  strip_comment(line);
-  trim(line);
+  if (strstr(line, "ManualMode")) {
+    manual_mode = true;
+    return;
+  }
+  // strip_comment(line);
+  // trim(line);
 
   if (strlen(line) == 0)
       return;
@@ -265,7 +284,7 @@ void process_line(char *line)
   // M-code handling
   if (m != -1)
   {
-    handle_spindle(line);
+    handle_spindle(line, m);
   }
 }
 
@@ -299,7 +318,7 @@ void handle_manual_mode() {
   int ch = getchar_timeout_us(0);
   if (ch != PICO_ERROR_TIMEOUT) {
     printf("%c\r\n", ch);
-    const int steps_per_press = 35;
+    const int steps_per_press = 50;
     switch (ch) {
       case 'a':
         mmhal_step_motors(-steps_per_press,0,0, state.current_coords);
@@ -371,7 +390,7 @@ void handle_manual_mode() {
         state.microsteps = 32;
         printf("Microstepping Mode: 5");
         break;
-      case '\033': // escape character
+      case 'm': // Toggle command/manual mode
         manual_mode = false;
         printf("Command Mode:\r\n");
         break;
@@ -380,7 +399,6 @@ void handle_manual_mode() {
         printf("%d,%d,%d", state.current_coords[XDIM], state.current_coords[YDIM], state.current_coords[ZDIM]);
         break;
       default:
-        // printf("%d", ch);
         break;
     }      
   }   
@@ -390,23 +408,19 @@ void process_input() {
   int ch = getchar_timeout_us(0);
   if ( ch != PICO_ERROR_TIMEOUT ) {
     switch (ch) {
-      case '\033': // escape character
-        manual_mode = true;
-        printf("Manual Mode:\r\n");
-        break;
       case '\r':
       case '\n':
         command[command_index] = 0;
-        printf("\n");
+        // printf("\n");
         command_index = 0;
         command_complete = true;
-        printf("%s", command);
+        // printf("%s", command);
         break;
       
       case '\b':
       case '\177':
         if (command_index > 0) {
-          printf("%c", ch);
+          // printf("%c", ch);
           command_index--;
         }
         break;
@@ -414,7 +428,7 @@ void process_input() {
       default:
         if (command_index != COMMAND_BUFFER_SIZE - 1) {
           command[command_index] = ch;
-          printf("%c", ch);
+          // printf("%c", ch);
           command_index++;
         }
         break;
@@ -427,6 +441,7 @@ void handle_command_mode() {
   if (command_complete) {
     process_line(command);
     command_complete = false;
+    printf("OK\r\n");
   }
 }
 
