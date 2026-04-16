@@ -32,7 +32,7 @@ volatile int mmhal_low_delay_us = 1000;   // Microseconds for step pulse low tim
  */
 void mmhal_init()
 {
-  // TODO - Initialise GPIO pins
+  // Initialise GPIO pins
   gpio_init(X_MODE0_PIN);
   gpio_init(X_MODE1_PIN);
   gpio_init(X_MODE2_PIN);
@@ -198,6 +198,13 @@ void mmhal_step_motors_impl(int dirs[3], int currentCoords[3], bool ignoreLimits
   // TODO - Implement the timing for the step pulses, using
   // mmhal_high_delay_us and mmhal_low_delay_us for the pulse timing
 }
+
+/** G0/G1 
+ * @brief (G0/G1)Perform Bresenham's line algorithm 
+ * @param x1 End point x coordinate
+ * @param y1 End point y coordinate
+ * @param currentCoords Current coordinates array
+ */
 void bresenham_step(int x1, int y1, int currentCoords[3])
 {
     int dx = abs(x1);
@@ -236,6 +243,14 @@ void bresenham_step(int x1, int y1, int currentCoords[3])
     }
 }
 
+/** Step_Stepper motors    
+ * @brief (G0/G1/G2/G3) Step motors in specified directions for specified number of steps, with optional limit checking
+ * @param dx Steps to move in x direction (positive or negative)
+ * @param dy Steps to move in y direction (positive or negative)
+ * @param dz Steps to move in z direction (positive or negative)
+ * @param currentCoords Current coordinates array used for limit checking
+ * @param ignoreLimits If true, ignore limit switches (used for manual jogging)
+ */
 void mmhal_step_motors(int dx, int dy, int dz, int currentCoords[3])
 {
   int dirs[3] = {dx, dy, dz};
@@ -270,6 +285,15 @@ void mmhal_step_motors(int dx, int dy, int dz, int currentCoords[3])
   } 
 }
 
+/** G2/G3 
+ * @brief (G2/G3)Move in an arc using Bresenham's algorithm
+ * @param x1 End point x coordinate 
+ * @param y1 End point y coordinate
+ * @param i Center x coordinate
+ * @param j Center y coordinate
+ * @param CW Clockwise flag
+ * @param currentCoords Current coordinates array
+ */
 void mmhal_move_arc(int x1, int y1, int i, int j, bool CW, int currentCoords[3])
 {
   int cx = i;
