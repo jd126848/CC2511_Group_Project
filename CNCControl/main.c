@@ -71,17 +71,10 @@ void trim(char *line)
 // -------------------------
 // Extract G or M code
 // -------------------------
-int get_gcode(char *line, int*sub)
+int get_gcode(char *line)
 {
     int g;
-    *sub = -1;
-    if (sscanf(line, "G%d", &g) == 1) {
-        char *dot = strchr(line, '.');
-        char *space = strchr(line, ' ');
-      if (dot &&(!space || dot < space))
-        sscanf(dot + 1, "%d", sub);
-        return g;
-    }
+    if (sscanf(line, "G%d", &g) == 1) return g;
     return -1;
 }
 
@@ -102,7 +95,18 @@ int get_mcode(char *line)
 void handle_linear_motion(char *line, int g)
 {
   int scale = (state.units_mm) ? STEPS_PER_MM : STEPS_PER_INCH;
-  float x = (float)state.current_coords[XDIM]/scale, y = (float)state.current_coords[YDIM]/scale, z = (float)state.current_coords[ZDIM]/scale, f = state.feedrate;
+  float x,y,z,f=state.feedrate =  f = state.feedrate;
+
+  if (state.absolute_mode) {
+    x = (float)state.current_coords[XDIM]/scale;
+    y = (float)state.current_coords[YDIM]/scale;
+    z = (float)state.current_coords[ZDIM]/scale;
+  }
+  else {
+    x = 0;
+    y = 0;
+    z = 0;
+  }
 
   char *ptr = line;
   while (*ptr) {
@@ -132,7 +136,7 @@ void handle_linear_motion(char *line, int g)
     mmhal_step_motors(dx,dy,dz,state.current_coords);
 
   }
-  else if (g == 1) {
+  else {
     // linear move
     printf("Linear move to %f %f %f F%.2f\n", x, y, z, f);
     mmhal_step_motors(dx,dy,dz,state.current_coords);
@@ -141,7 +145,7 @@ void handle_linear_motion(char *line, int g)
 
 
 // Arc motion (G2 / G3)
-void handle_arcs(char *line, int g)
+void handle_arcs(char *line)
 {
   float x = 0, y = 0, i = 0, j = 0;
   char *ptr = line;
@@ -169,11 +173,10 @@ void handle_arcs(char *line, int g)
     Yoff = j*scale;
   }
 
-  if (g == 2) {
+  if (strstr(line, "G2") || strstr(line, "G02")) {
       printf("CW Arc to %f %f center %f %f\n", x, y, i, j);
       mmhal_move_arc(Xfin, Yfin, Xoff, Yoff, true, state.current_coords);
-  } 
-  else if (g == 3) {
+  } else {
       printf("CCW Arc to %f %f center %f %f\n", x, y, i, j);
       mmhal_move_arc(Xfin, Yfin, Xoff, Yoff, false, state.current_coords);
   }
@@ -184,22 +187,16 @@ void handle_arcs(char *line, int g)
 // Spindle
 void handle_spindle(char *line, int m)
 {
-  int s = -1;
-
-  char *s_ptr = strchr(line, 'S');
-  if (s_ptr) {
-    sscanf(s_ptr + 1, "%d", &s);
+  int s = 0;
+  char *ptr = line;
+  while (*ptr) {
+    if (*ptr == 'S') sscanf(ptr+1, "%d", &s);
+    ptr++;
   }
-  
+
   if (m == 3) {
-    if (s >= 0) {
-      printf("Spindle ON at speed %d\n", s);
-      mmhal_set_spindle_pwm(s);
-    } 
-    else {
-      printf("Spindle ON (default speed)\n");
-      mmhal_set_spindle_pwm(255);
-    }
+    printf("Spindle ON at speed %d\n", s);
+    mmhal_set_spindle_pwm(s);
   }
   else if (m == 5) {
     printf("Spindle OFF\n");
@@ -210,21 +207,18 @@ void handle_spindle(char *line, int m)
 
 void process_line(char *line)
 {
-  strip_comment(line);
-  trim(line);
+  if (strstr(line, "ManualMode")) {
+    manual_mode = true;
+    return;
+  }
+  // strip_comment(line);
+  // trim(line);
 
   if (strlen(line) == 0)
       return;
 
-  int sub = -1;
-  int g = get_gcode(line, &sub);
+  int g = get_gcode(line);
   int m = get_mcode(line);
-
-  // M-code handling
-  if (m != -1)
-  {
-    handle_spindle(line, m);
-  }
 
   // -------------------------
   // G-code handling
@@ -233,19 +227,19 @@ void process_line(char *line)
   {
     switch (g)
     {
-    case 0: case 1: // Linear Movement // Linear moves
+    case 0: case 1: // Linear Movement
       handle_linear_motion(line, g);
       break;
 
     case 2: case 3: // Arc Movement
-      handle_arcs(line, g);
+      handle_arcs(line);
       break;
 
     case 4: { // dwell
       float p;
       if (sscanf(line, "G%*d P%f", &p) == 1) {
-        printf("Dwell for %.2f seconds\n", p);
-        sleep_ms((uint32_t)(p * 1000));
+        printf("Dwell for %.2f\n", p);
+        sleep_ms((uint32_t)(p));
       }
       break;
     }
@@ -271,7 +265,7 @@ void process_line(char *line)
       break;
 
     case 28:
-      if (sub == 1) {
+      if (strstr(line, "G28.1") != NULL) {
         printf("Home Set\r\n");
         state.home_coords[XDIM] = state.current_coords[XDIM];
         state.home_coords[YDIM] = state.current_coords[YDIM];
@@ -285,6 +279,12 @@ void process_line(char *line)
     default:
       break;
     }
+  }
+
+  // M-code handling
+  if (m != -1)
+  {
+    handle_spindle(line, m);
   }
 }
 
@@ -318,7 +318,7 @@ void handle_manual_mode() {
   int ch = getchar_timeout_us(0);
   if (ch != PICO_ERROR_TIMEOUT) {
     printf("%c\r\n", ch);
-    const int steps_per_press = 35;
+    const int steps_per_press = 50;
     switch (ch) {
       case 'a':
         mmhal_step_motors(-steps_per_press,0,0, state.current_coords);
@@ -390,7 +390,7 @@ void handle_manual_mode() {
         state.microsteps = 32;
         printf("Microstepping Mode: 5");
         break;
-      case '\033': // escape character
+      case 'm': // Toggle command/manual mode
         manual_mode = false;
         printf("Command Mode:\r\n");
         break;
@@ -399,7 +399,6 @@ void handle_manual_mode() {
         printf("%d,%d,%d", state.current_coords[XDIM], state.current_coords[YDIM], state.current_coords[ZDIM]);
         break;
       default:
-        // printf("%d", ch);
         break;
     }      
   }   
@@ -409,23 +408,19 @@ void process_input() {
   int ch = getchar_timeout_us(0);
   if ( ch != PICO_ERROR_TIMEOUT ) {
     switch (ch) {
-      case '\033': // escape character
-        manual_mode = true;
-        printf("Manual Mode:\r\n");
-        break;
       case '\r':
       case '\n':
         command[command_index] = 0;
-        printf("\n");
+        // printf("\n");
         command_index = 0;
         command_complete = true;
-        printf("%s", command);
+        // printf("%s", command);
         break;
       
       case '\b':
       case '\177':
         if (command_index > 0) {
-          printf("%c", ch);
+          // printf("%c", ch);
           command_index--;
         }
         break;
@@ -433,7 +428,7 @@ void process_input() {
       default:
         if (command_index != COMMAND_BUFFER_SIZE - 1) {
           command[command_index] = ch;
-          printf("%c", ch);
+          // printf("%c", ch);
           command_index++;
         }
         break;
@@ -446,6 +441,7 @@ void handle_command_mode() {
   if (command_complete) {
     process_line(command);
     command_complete = false;
+    printf("OK\r\n");
   }
 }
 

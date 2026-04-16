@@ -7,7 +7,9 @@ BoxLayout:
             orientation: "vertical"
             size_hint_x: 0.3
             Button:
+                background_color: "yellow"
                 text: "Calibrate"
+                on_release: app.handle_calibrate()
             BoxLayout:
                 Label:
                     text: "Spindle Speed"
@@ -23,9 +25,18 @@ BoxLayout:
                     id: microsteps_spinner
                     text_autoupdate: True
                     values: ["1step/step", "2microsteps/step", "4microsteps/step", "8microsteps/step", "16microsteps/step", "32microsteps/step"]
-                    on_text: app.set_microsteps()
+                    on_text: app.set_microsteps(self.text)
+            TextField:
+                id: g_code_input
+                multiline: False
+                write_tab: False
+                hint_text: "Enter G-Code here..."
+                on_text_validate: app.handle_manual_gcode()
             Button:
-                background_color: "red"
+                text: "Send G-Code"
+                on_release: app.handle_manual_gcode()
+            Button:
+                background_color: "blue"
                 text: "Import G-Code File"
                 on_release: app.handle_gcode()
         BoxLayout:
@@ -45,15 +56,29 @@ BoxLayout:
                     Color:
                         rgba: 1,1,1,1
                     Rectangle:
-                        pos: self.x, self.y + (self.height - self.width * 175/300) / 2
-                        size: self.width, self.width*175/300
+
+                        pos: app.rect_pos
+
+                        size: app.rect_size
                     Color:
                         rgba: 1, 0, 0, 1
                     Ellipse:
                         size: 15,15
-                        pos: 100, 100
-
-
+                        pos: app.drill_pos
+            BoxLayout:
+                size_hint_y: 0.15
+                Button:
+                    background_color: "green"
+                    text: "Home"
+                    on_release: app.handle_go_home()
+                Button:
+                    background_color: "green"
+                    text: "Set Home"
+                    on_release: app.handle_set_home()
+                Button:
+                    background_color: "red"
+                    text: "STOP"
+                    on_release: app.handle_stop()
     BoxLayout:
         size_hint_y: 0.07
         canvas:
