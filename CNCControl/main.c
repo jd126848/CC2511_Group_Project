@@ -24,7 +24,6 @@ char command[COMMAND_BUFFER_SIZE];
 unsigned int command_index = 0;
 bool command_complete = false;
 
-
 // -------------------------
 // Machine state
 // -------------------------
@@ -88,10 +87,14 @@ int get_mcode(char *line)
 // =======================================================
 // GROUP HANDLERS
 // =======================================================
-
-// -------------------------
-// Linear motion (G0 / G1)
-// -------------------------
+/** Linear motion (G0 / G1)  pass to                mmhal_step_motors()
+* @brief  G0/G1 code parsing and calls              mmhal_step_motors() to execute Stepper motors.  
+* @param  G0 indicates rapid move
+* @param  G1 indicates linear move
+* @param  line: ( X_, Y_, Z_, F_) command parameters .
+* @note   F_ feedrate is parsed and stored but NOT implimented in this version. 
+* @note   Assumes G-code line properly formatted. Done by get_gcode() prior to function.
+*/
 void handle_linear_motion(char *line, int g)
 {
   int scale = (state.units_mm) ? STEPS_PER_MM : STEPS_PER_INCH;
@@ -116,8 +119,6 @@ void handle_linear_motion(char *line, int g)
     if (*ptr == 'F') {sscanf(ptr+1, "%f", &f); state.feedrate = f;}
     ptr++;
   }
-
-  
   
   int dx,dy,dz;
   if (state.absolute_mode) {
@@ -131,20 +132,25 @@ void handle_linear_motion(char *line, int g)
   }
 
   if (g == 0) {
-    // rapid move
+    // rapid move (G0) 
     printf("Rapid move to %f %f %f\n", x, y, z);
     mmhal_step_motors(dx,dy,dz,state.current_coords);
 
   }
   else {
-    // linear move
+    // linear move (G1) 
     printf("Linear move to %f %f %f F%.2f\n", x, y, z, f);
     mmhal_step_motors(dx,dy,dz,state.current_coords);
   }
 }
 
-
-// Arc motion (G2 / G3)
+/** Arc motion (G2 / G3)              pass to        mmhal_move_arc() 
+* @brief  G2/G3 code parsing and calls              mhal_move_arc() to execute Stepper motors.
+* @param  G2 indicates CW: boolean true,  passed to mmhal_move_arc([5])
+* @param  G3 indicates CCW: boolean false passed to mmhal_move_arc([5])
+* @param  line: (X_, Y_, I_, J_) arc command parameters .
+* @note   Assumes G-code line properly formatted. Done by get_gcode() prior to function.
+*/
 void handle_arcs(char *line)
 {
   float x = 0, y = 0, i = 0, j = 0;
@@ -182,9 +188,12 @@ void handle_arcs(char *line)
   }
 }
 
-
-
-// Spindle
+/** Spindle control (M3 / M5)         pass to        handle_spindle()
+* @brief  m3/m5 parsing the "line" for (S_)calls    mmhal_set_spindle_pwm() to set spindle speed.
+* @param  m3: followed by spindle speed (S parameter) from the line and sets the spindle PWM accordingly. For M5, it turns off the spindle by setting the PWM to 0.
+* @param  m5: turns off the spindle. Set PWM to 0.
+* @note   Assumes G/M-code line properly formatted. Done by get_gcode() prior to function.
+*/
 void handle_spindle(char *line, int m)
 {
   int s = 0;
@@ -204,7 +213,16 @@ void handle_spindle(char *line, int m)
   }
 }
 
-
+/** G code Parsing.                   pass to        various handlers
+* @brief  Parse G/M-code. Determines if G0/G1, G2/G3, G4, G20\G21, G90\G91, G28,  M3\M5  else ignore input 
+* @param  G0/G1: calls                              handle_linear_motion() 
+* @param  G2/G3: calls                              handle_arcs()
+* @param  G4: Dwell for specified time (P parameter)
+* @param  G20/G21: Set units to inches/mm
+* @param  G90/G91: Set absolute/relative mode
+* @param  G28: Move to home position or set current position as home (G28.1)
+* @param  M3/M5: calls                              handle_spindle() to set spindle speed or turn off
+*/
 void process_line(char *line)
 {
   if (strstr(line, "ManualMode")) {
@@ -288,7 +306,11 @@ void process_line(char *line)
   }
 }
 
-
+/** CALIBRATE using limit switches   X,Y = 0,0      Z_LIMIT = max Height 
+ * @brief  Move each axis to its limit switch until triggered, then set current position to known limit value.
+ * @note   Sets current position to     0 for X and Y
+ * @note   Sets Z_LIMIT for Z after calibration. i.e. Z limit switch is at max height. Z=0 is at lowest point and needs to be manually calibrated nd dependant upon router bit fitment.  
+ */
 void calibrate_position() {
   int xCalDir[3] = {-1,0,0};
   int yCalDir[3] = {0,-1,0};
@@ -312,8 +334,12 @@ void calibrate_position() {
   printf("Z-Limit Reached\r\n");
 }
 
-
-
+/** MANUAL MODE HANDLER for testing
+ * @brief  Handle manual mode input for testing. 
+ * @note WASD to move XY, QE to move Z, 
+ * @note +/- to adjust spindle speed, 0-5 to set microstepping mode,
+ * @note m to toggle back to command mode, c to calibrate position using limit switches.
+ */
 void handle_manual_mode() {
   int ch = getchar_timeout_us(0);
   if (ch != PICO_ERROR_TIMEOUT) {
@@ -404,6 +430,14 @@ void handle_manual_mode() {
   }   
 }
 
+/** BUFFERING input and pass to                      handle_command_mode()
+ * @brief  Process input for command mode. Builds command string until newline, then sets command_complete flag for processing.
+ * @note   Backspace handling;  Assumes sends backspace as '\b' or '\177'.
+ * @note   Command string is stored in buffer char command[64], with index command_index tracking current position. 
+ * @note   Once \r \n recieved set command_complete = true   
+ * @note   when command_complete == true, passed to handle_command_mode() for processing 
+ * @note   After processing, reset command_complete = false command_index = 0 ready for next command.
+ */
 void process_input() {
   int ch = getchar_timeout_us(0);
   if ( ch != PICO_ERROR_TIMEOUT ) {
@@ -436,6 +470,7 @@ void process_input() {
   }
 }
 
+/**HANDLE COMMAND_MODE buffered       pass to        process_line() */
 void handle_command_mode() {
   process_input();
   if (command_complete) {
@@ -444,7 +479,8 @@ void handle_command_mode() {
     printf("OK\r\n");
   }
 }
-
+// =======================================================  ========================================================
+//  MAIN LOOP  
 int main(void) {
   // Initialise components and variables
   state.absolute_mode = true;
