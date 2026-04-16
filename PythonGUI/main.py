@@ -61,13 +61,14 @@ class CNCApp(App):
                 line = line.decode()
                 print(line)
                 self.status_text = line
-                if line.startswith("POS"):
+
+                if line.startswith("POS"): #Set drill coordinates
                     parts = line.split(" ")
                     self.coords[0] = int(parts[1][2:])
                     self.coords[1] = int(parts[2][2:])
                     self.coords[2] = int(parts[3][2:])
                     self.set_coords()
-                elif line.strip() == "OK":
+                elif line.strip() == "OK": #Prepare to send next G-Code Line
                     self.ready_to_send = True
                     if self.gcode_done and not self.mode_manual:
                         self.mode_manual = True
@@ -76,7 +77,7 @@ class CNCApp(App):
                         self.single_input = False
                         self.mode_manual = True
                         self.send_serial("ManualMode\r\n")
-            if self.ready_to_send:
+            if self.ready_to_send: #Send next line of G-Code
                 self.ready_to_send = False
                 self.send_gcode()
 
