@@ -213,7 +213,7 @@ void bresenham_step(int x1, int y1, int currentCoords[3])
 
     while (x != x1 || y != y1)
     {
-      if (getchar_timeout_us(0) == ' ') break;
+      if (getchar_timeout_us(0) == 'l') break;
       int D = 2 * diff;
 
       int step_x = 0;
@@ -254,7 +254,7 @@ void mmhal_step_motors(int dx, int dy, int dz, int currentCoords[3])
       step_dir[ZDIM] = (steps > 0) ? 1 : -1;
     }
     for (size_t i = 0; i < abs(steps); i++) {
-      if (getchar_timeout_us(0) == ' ') break;
+      if (getchar_timeout_us(0) == 'l') break;
       mmhal_step_motors_impl(step_dir, currentCoords, false);
     }
   }
@@ -264,7 +264,7 @@ void mmhal_step_motors(int dx, int dy, int dz, int currentCoords[3])
     step_dir[ZDIM] = (dirs[ZDIM] > 0) ? 1 : -1;
     for (size_t i = 0; i < abs(dirs[ZDIM]); i++)
     {
-      if (getchar_timeout_us(0) == ' ') break;
+      if (getchar_timeout_us(0) == 'l') break;
       mmhal_step_motors_impl(step_dir, currentCoords, false);
     }
   } 
@@ -295,7 +295,7 @@ void mmhal_move_arc(int x1, int y1, int i, int j, bool CW, int currentCoords[3])
   {
     int px = cx + x;
     int py = cy + y;
-    if (getchar_timeout_us(0) == ' ') break;
+    if (getchar_timeout_us(0) == 'l') break;
     mmhal_step_motors(px - xpos, py - ypos, 0, currentCoords);
 
     xpos = px;
@@ -311,7 +311,7 @@ void mmhal_move_arc(int x1, int y1, int i, int j, bool CW, int currentCoords[3])
 
     for (int k = 0; k < 8; k++)
     {
-      if (getchar_timeout_us(0) == ' ') break;
+      if (getchar_timeout_us(0) == 'l') break;
       int nx = x + dirs[k][0];
       int ny = y + dirs[k][1];
 

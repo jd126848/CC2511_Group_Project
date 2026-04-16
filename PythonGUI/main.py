@@ -1,6 +1,7 @@
 import time
 
 import serial
+from kivy.uix import switch
 from plyer import filechooser
 from kivy.app import App
 from kivy.app import Builder
@@ -95,8 +96,21 @@ class CNCApp(App):
         self.drill_speed = new_speed
         print(self.root.ids.spindle_speed_spinner.text)
 
-    def set_microsteps(self):
-        print(self.root.ids.microsteps_spinner.text)
+    def set_microsteps(self,text):
+        microstep_speed = self.root.ids.microsteps_spinner.text
+        print(text)
+        if microstep_speed == "1step/step":
+            self.send_serial("0\r\n")
+        elif microstep_speed == "2microsteps/step":
+            self.send_serial("1\r\n")
+        elif microstep_speed == "4microsteps/step":
+            self.send_serial("2\r\n")
+        elif microstep_speed == "8microsteps/step":
+            self.send_serial("3\r\n")
+        elif microstep_speed == "16microsteps/step":
+            self.send_serial("4\r\n")
+        elif microstep_speed == "32microsteps/step":
+            self.send_serial("5\r\n")
 
     def set_coords(self):
         self.coords_text = f"X: {self.coords[0]/50}mm, Y: {self.coords[1]/50}mm, Z: {self.coords[2]/50}mm"
@@ -120,7 +134,7 @@ class CNCApp(App):
 
     def send_gcode(self):
         if self.current_gcode:
-            self.send_serial(f"{self.current_gcode[0].strip()}\r\n")
+            self.send_serial(f"{self.current_gcode[0].strip().upper()}\r\n")
             print(self.current_gcode)
             del self.current_gcode[0]
             print(self.current_gcode)
@@ -150,8 +164,11 @@ class CNCApp(App):
         self.send_serial("G28.1\r\n")
 
     def on_key_down(self, keyboard, keycode, text, modifiers):
-        if keycode[1] in "qweasd=-012345 ":
+        if keycode[1] in "qweasd=-012345 l":
             self.send_serial(keycode[1])
+
+    def handle_stop(self):
+        self.send_serial("l")
 
 class TextField(TextInput):
     def __init__(self, **kwargs):

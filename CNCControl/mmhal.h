@@ -6,7 +6,7 @@
 // Movement Limits (steps)
 #define X_LIMIT 15000 //* STEPS_PER_MM
 #define Y_LIMIT 7800// * STEPS_PER_MM
-#define Z_LIMIT 1800// * STEPS_PER_MM
+#define Z_LIMIT 1275// * STEPS_PER_MM
 
 #define STEPS_PER_MM 50
 #define STEPS_PER_INCH 1270

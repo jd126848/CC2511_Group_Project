@@ -239,7 +239,7 @@ void process_line(char *line)
       float p;
       if (sscanf(line, "G%*d P%f", &p) == 1) {
         printf("Dwell for %.2f\n", p);
-        sleep_ms((uint32_t)(p * 1000));
+        sleep_ms((uint32_t)(p));
       }
       break;
     }
